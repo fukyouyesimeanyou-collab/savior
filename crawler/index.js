@@ -62,6 +62,47 @@ app.post('/crawl', async (req, res) => {
       return res.status(500).json({ error: error.message });
     }
   }
+  else if (url.includes('grok.com/share/')) {
+    console.log('[Crawler] 偵測到 Grok 分享連結，使用 Puppeteer + REST API 方式');
+    let browser = null;
+    try {
+      const shareId = url.split('/share/')[1];
+      if (!shareId) {
+        return res.status(400).json({ error: 'Invalid Grok share URL' });
+      }
+
+      browser = await puppeteer.connect({
+        browserWSEndpoint: 'ws://127.0.0.1:9222'
+      });
+
+      const page = await browser.newPage();
+      await page.setDefaultNavigationTimeout(30000);
+      await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+
+      await page.goto(url, { waitUntil: 'networkidle2' });
+      await new Promise(r => setTimeout(r, 3000));
+
+      const apiData = await page.evaluate(async (id) => {
+        const res = await fetch('/rest/app-chat/share_links/' + id, {
+          headers: { 'Accept': 'application/json' }
+        });
+        if (!res.ok) throw new Error('API error: ' + res.status);
+        return await res.json();
+      }, shareId);
+
+      console.log('[Crawler] Grok REST API 抓取成功，responses 數量: ' + apiData.responses.length);
+      return res.status(200).json({ grokData: apiData });
+
+    } catch (error) {
+      console.error('[Crawler] Grok 抓取錯誤:', error.message);
+      return res.status(500).json({ error: error.message });
+    } finally {
+      if (browser) {
+        await browser.disconnect();
+        console.log('[Crawler] 已斷開與 browser 的連線');
+      }
+    }
+  }
   
   // 非 ChatGPT 分享連結，使用原有的 Puppeteer 流程
   let browser = null;
