@@ -62,6 +62,28 @@ app.post('/crawl', async (req, res) => {
       return res.status(500).json({ error: error.message });
     }
   }
+  else if (url.includes('grok.com/share/') || url.includes('x.com/i/grok/share/')) {
+    console.log('[Crawler] 偵測到 Grok 分享連結，使用直接 fetch 方式');
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Referer': 'https://grok.com/',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+          'Accept-Language': 'zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7'
+        }
+      });
+      if (!response.ok) {
+        throw new Error('HTTP error! Status: ' + response.status);
+      }
+      const html = await response.text();
+      console.log('[Crawler] Grok 分享連結抓取完成，HTML 長度: ' + html.length + ' bytes');
+      return res.status(200).json({ html });
+    } catch (error) {
+      console.error('[Crawler] Grok 分享連結抓取錯誤:', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+  }
   
   // 非 ChatGPT 分享連結，使用原有的 Puppeteer 流程
   let browser = null;

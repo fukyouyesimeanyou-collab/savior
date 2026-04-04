@@ -1,0 +1,23 @@
+# Savior Project Constitution & Efficiency Rules
+
+## 1. Token Economy (Cost Control)
+- **No Yapping**: 禁止任何開場白（如 "Certainly", "Okay"）、結尾問候或冗長的邏輯解釋。直接輸出代碼或結果。
+- **Minimal Context**: 除非絕對必要，禁止主動讀取 `node_modules` 或 `dist` 資料夾。已在根目錄 `.gitignore` 排除的項目嚴禁掃描。
+- **Targeted Reading**: 修改檔案前，僅讀取該檔案及其直接 Import 的相關檔案。禁止執行全局搜尋除非是為了重構變數名。
+- **Brief Summaries**: 任務完成後，僅以一行文字回報變動內容，禁止產生長篇大論的研發紀錄。
+
+## 2. Architecture Integrity (Savior Specifics)
+- **Tech Stack**: Vue 3 (Composition API), Vite, TypeScript, Dexie.js (IndexedDB), Puppeteer/Lightpanda.
+- **Parsing Strategy**: 優先使用「正則表達式 + 二次 JSON 解碼」處理 React Flight 串流。禁止回退到脆弱的 DOM 選擇器，除非目標平台是靜態 HTML。
+- **Pattern Preservation**: 遵循 `frontend/src/parser/index.ts` 中的 `decodeLoader` 模式處理複雜的索引扁平化資料。
+- **Modular Crawler**: 保持 `crawler/index.js` 的輕量化，爬蟲邏輯與前端解析必須完全解耦。
+
+## 3. Workflow & Safety
+- **One Step at a Time**: 每次 Commit 只處理一個微型功能或修復。禁止一次性改動多個模組。
+- **Model Awareness**: 對於單純的樣式（CSS）或文件修改，主動提示使用者切換至 `gpt-4o-mini` 或 `gemini-2.0-flash-lite` 以節省費用。
+- **Dry Run**: 在執行高併發或迴圈寫入資料庫（Dexie）的操作前，必須先輸出邏輯計畫供確認。
+
+## 4. Platform Constraints
+- **ChatGPT**: 鎖定 `streamController.enqueue` 進行提取。
+- **Gemini**: 偵測 `window._DATA` 物件進行靜態解碼。
+- **Grok**: 鎖定 `.thread-content` 或 `X-API` 回傳的 JSON。
