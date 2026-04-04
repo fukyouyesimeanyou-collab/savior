@@ -1,0 +1,5 @@
+/* 2026 Tailwind CSS 4.0 核心指令
+   這行指令會自動加載所有的工具類、重置樣式 (Preflight) 以及響應式斷點。
+   不再需要分開寫 @tailwind base, components, utilities。
+*/
+@import "tailwindcss";
