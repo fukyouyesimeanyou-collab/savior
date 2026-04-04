@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { db, type Conversation } from './db'
-import { fetchShareLink, detectPlatform } from './fetcher'
+import { fetchShareLink, fetchGrokShareLink, detectPlatform } from './fetcher'
 import { parseConversation } from './parser'
 
 // 定義響應式變數，用來儲存使用者貼上的連結
@@ -36,14 +36,33 @@ const handleFetch = async () => {
       return
     }
     
-    // 2. 抓取 HTML
-    const html = await fetchShareLink(aiLink.value)
-    console.log('[Debug] 拿到的 HTML 前 500 字:', html.substring(0, 500))
-    console.log('[Step 2] Fetch 完成，html 長度:', html.length)
+    let rawText = ''
     
-    // 3. 解析純文字
-    const rawText = parseConversation(html, platform)
-    console.log('[Step 3] 解析完成，rawText 長度:', rawText.length)
+    // 2. 根據平台分流處理
+    if (platform === 'grok') {
+      // Grok 平台特殊處理
+      console.log('[Step 2] 偵測到 Grok 平台，使用 JSON 資料流')
+      const responses = await fetchGrokShareLink(aiLink.value)
+      console.log('[Debug] 拿到的 Grok responses 數量:', responses.length)
+      
+      // 將 responses 轉換為純文字格式
+      rawText = responses.map((response: any) => {
+        const sender = response.sender === 'human' ? '使用者' : 'Grok'
+        return `${sender}: ${response.message}`
+      }).join('\n\n')
+      
+      console.log('[Step 3] Grok 資料轉換完成，rawText 長度:', rawText.length)
+    } else {
+      // 其他平台使用原有流程
+      // 2. 抓取 HTML
+      const html = await fetchShareLink(aiLink.value)
+      console.log('[Debug] 拿到的 HTML 前 500 字:', html.substring(0, 500))
+      console.log('[Step 2] Fetch 完成，html 長度:', html.length)
+      
+      // 3. 解析純文字
+      rawText = parseConversation(html, platform)
+      console.log('[Step 3] 解析完成，rawText 長度:', rawText.length)
+    }
     
     // 4. 存入 IndexedDB
     await db.conversations.add({

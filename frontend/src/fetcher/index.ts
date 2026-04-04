@@ -8,6 +8,23 @@ export async function fetchShareLink(url: string): Promise<string> {
   return await response.text()
 }
 
+export async function fetchGrokShareLink(url: string): Promise<any> {
+  const response = await fetch('http://localhost:3001/crawl', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ url })
+  })
+  
+  if (!response.ok) {
+    throw new Error(`Grok Fetch 失敗：${response.status}`)
+  }
+  
+  const data = await response.json()
+  return data.grokData.responses
+}
+
 export function detectPlatform(url: string): 'chatgpt' | 'claude' | 'gemini' | 'perplexity' | 'grok' | null {
   if (url.includes('chatgpt.com')) return 'chatgpt'
   if (url.includes('claude.ai')) return 'claude'
