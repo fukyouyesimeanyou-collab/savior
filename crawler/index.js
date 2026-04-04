@@ -63,43 +63,67 @@ app.post('/crawl', async (req, res) => {
     }
   }
   else if (url.includes('grok.com/share/')) {
-    console.log('[Crawler] 偵測到 Grok 分享連結，使用 Puppeteer + REST API 方式');
-    let browser = null;
+    console.log('[Crawler] 偵測到 Grok 分享連結，使用 FlareSolverr');
+    const FLARE_URL = 'http://10.88.0.1:8191/v1';
+    const SESSION_ID = 'savior-grok-' + Date.now();
     try {
       const shareId = url.split('/share/')[1];
       if (!shareId) {
         return res.status(400).json({ error: 'Invalid Grok share URL' });
       }
 
-      browser = await puppeteer.connect({
-        browserWSEndpoint: 'ws://127.0.0.1:9222'
+      // 建立 session
+      await fetch(FLARE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cmd: 'sessions.create', session: SESSION_ID })
+      });
+      console.log('[Crawler] FlareSolverr session 建立: ' + SESSION_ID);
+
+      // 抓取 Grok REST API
+      const apiUrl = 'https://grok.com/rest/app-chat/share_links/' + shareId;
+      const flareRes = await fetch(FLARE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cmd: 'request.get',
+          url: apiUrl,
+          session: SESSION_ID,
+          maxTimeout: 60000
+        })
       });
 
-      const page = await browser.newPage();
-      await page.setDefaultNavigationTimeout(30000);
-      await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+      const flareData = await flareRes.json();
 
-      await page.goto(url, { waitUntil: 'networkidle2' });
-      await new Promise(r => setTimeout(r, 3000));
+      if (flareData.status !== 'ok' || flareData.solution.status !== 200) {
+        throw new Error('FlareSolverr failed: ' + flareData.message);
+      }
 
-      const apiData = await page.evaluate(async (id) => {
-        const res = await fetch('/rest/app-chat/share_links/' + id, {
-          headers: { 'Accept': 'application/json' }
-        });
-        if (!res.ok) throw new Error('API error: ' + res.status);
-        return await res.json();
-      }, shareId);
+      // 從 HTML 包裝中提取 JSON
+      const responseText = flareData.solution.response;
+      const jsonMatch = responseText.match(/<pre[^>]*>([\s\S]*?)<\/pre>/);
+      if (!jsonMatch) {
+        throw new Error('Cannot extract JSON from FlareSolverr response');
+      }
 
-      console.log('[Crawler] Grok REST API 抓取成功，responses 數量: ' + apiData.responses.length);
-      return res.status(200).json({ grokData: apiData });
+      const grokData = JSON.parse(jsonMatch[1]);
+      console.log('[Crawler] Grok 抓取成功，responses 數量: ' + grokData.responses.length);
+      return res.status(200).json({ grokData });
 
     } catch (error) {
       console.error('[Crawler] Grok 抓取錯誤:', error.message);
       return res.status(500).json({ error: error.message });
     } finally {
-      if (browser) {
-        await browser.disconnect();
-        console.log('[Crawler] 已斷開與 browser 的連線');
+      // 釋放 session
+      try {
+        await fetch(FLARE_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cmd: 'sessions.destroy', session: SESSION_ID })
+        });
+        console.log('[Crawler] FlareSolverr session 已釋放: ' + SESSION_ID);
+      } catch (e) {
+        console.warn('[Crawler] Session 釋放失敗（非致命）:', e.message);
       }
     }
   }
@@ -192,11 +216,11 @@ app.post('/crawl', async (req, res) => {
     
     // 檢查 HTML 內容是否包含可能的對話內容標記
     const hasConversationContent = html.includes('message') ||
-                                  html.includes('chat') ||
-                                  html.includes('conversation') ||
-                                  html.includes('dialog') ||
-                                  html.includes('thread') ||
-                                  html.includes('comment');
+                                 html.includes('chat') ||
+                                 html.includes('conversation') ||
+                                 html.includes('dialog') ||
+                                 html.includes('thread') ||
+                                 html.includes('comment');
     
     if (!hasConversationContent) {
       console.log('[Crawler] 警告: HTML 內容可能不包含對話內容');
